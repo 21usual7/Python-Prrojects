@@ -1,0 +1,128 @@
+import random
+
+class StockMarket:
+    def __init__(self):
+        self.stock_data = {"Meta": 150, "Apple": 200, "Nvidia": 350}
+
+    def display_stock_info(self):
+        return self.stock_data
+
+    def buy_stock(self, ticker, amount, balance):
+        stock_price = self.stock_data[ticker]
+        total_cost = stock_price * amount
+        if amount <= 0:
+            return "Amount must be greater than zero."
+        if balance < total_cost:
+            return f"You don't have enough credit to buy {amount} of {ticker}. It costs {total_cost}, but you only have {balance}."
+        self.stock_data[ticker] += 10  # Increase stock price
+        balance -= total_cost
+        return f"Successfully bought {amount} of {ticker} for {total_cost}. Remaining balance: {balance}"
+
+    def sell_stock(self, ticker, amount, balance):
+        stock_price = self.stock_data[ticker]
+        total_earnings = stock_price * amount
+        self.stock_data[ticker] -= 10  # Decrease stock price
+        balance += total_earnings
+        return f"Successfully sold {amount} of {ticker} for {total_earnings}. New balance: {balance}"
+
+
+class RandomStrategy:
+    def random_strategy(self, stock_market):
+        stock_data = stock_market.display_stock_info()
+        stock_ticker = random.choice(list(stock_data.keys()))
+        action = random.choice(["Buy", "Sell"])
+        max_amount = 10  # Limit random purchases/sales to a max of 10 stocks
+        random_amount = random.randint(1, max_amount)
+        return stock_ticker, action, random_amount
+
+
+class AnalogyStrategy:
+    def analogy_strategy(self, stock_market, stock_ticker):
+        stock_data = stock_market.display_stock_info()
+        current_price = stock_data[stock_ticker]
+        previous_price = current_price - 10  # Example logic to simulate previous price
+        if previous_price < current_price:
+            self.action = "Buy"
+            return self.action
+        elif previous_price > current_price:
+            self.action = "Sell"
+            return self.action
+        else:
+            return "Hold"
+        
+class HypeStrategy:
+    def hype_strategy(self, stock_market, stock_ticker):
+        self.stock_data = stock_market.display_stock_info()
+        self.current_price = self.stock_data[stock_ticker]
+        self.previus_price = current_price + 1 
+
+        if self.previus_price < self.current_price:
+            self.action = "Buy"
+            return self.action
+        elif self.previus_price > self.current_price:
+            self.aciton = "Sell"
+            return self.action
+        else:
+            return "Nothing is Hyping right now 🔥" 
+
+
+class Trader:
+    def __init__(self, balance, strategy):
+        self.balance = balance
+        self.strategy = strategy  # Strategy should be an instance of RandomStrategy or AnalogyStrategy
+
+    def make_trade_random(self, stock_market):
+        stock_ticker, action, random_amount = self.strategy.random_strategy(stock_market)
+        if action == "Buy":
+            self.result = stock_market.buy_stock(stock_ticker, random_amount, self.balance)
+        elif action == "Sell":
+            self.result = stock_market.sell_stock(stock_ticker, random_amount, self.balance)
+        else:
+            self.result = "No action taken."
+        return result
+    
+    def make_analogy_trade(self, stock_market, stock_ticker):
+        analog_init = action_strategy.analogy_strategy(self, stock_ticker)
+        if action == "Buy":
+            result_analogy = stock_market.buy_stock(stock_ticker, amount, self.balance)
+        elif action == "Sell":
+            result_analogy = stock_market.sell_stock(stock_ticker, random_amount, self.balance)
+        else:
+            result_analogy = "No action taken."
+        return result_analogy
+    
+    def make_hype_trade(self, stock_market, stock_ticker):
+        hype_init = hyping_strategy.hype_strategy(self, stock_tiker)
+        if action == "Buy":
+            result_hype_strategy = stock_market.buy_stock(stock_ticker, amount, self.balance)
+        elif action == "Sell":
+            result_hype_strategy = stock_market.sell_stock(stock_ticker, random_amount, self.balance)
+        else:
+             result_hype_strategy = "No Hyping right now"
+        return  result_hype_strategy
+
+
+class StockInfo:
+    def __init__(self, stock_market):
+        self.stock_data = stock_market.display_stock_info()
+        self.price_history = {ticker: [price] for ticker, price in self.stock_data,items()}
+    
+    def update_price(self, ticker, new_price):
+        if ticker in self.price_history:
+            self.price_history[ticker].append(new_price)
+        else:
+            self.price_history[ticker] = [new_price]
+
+    def get_price_history(self, ticker):
+        return self.price_history.get(ticker, [])
+
+
+    
+
+
+# Example usage
+stock_market = StockMarket()
+random_strategy = RandomStrategy()
+action_strategy = AnalogyStrategy()
+hyping_strategy = HypeStrategy()
+trader = Trader(1000, random_strategy)
