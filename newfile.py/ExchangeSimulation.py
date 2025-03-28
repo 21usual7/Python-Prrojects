@@ -1,4 +1,5 @@
 import random
+import json
 
 class StockMarket:
     def __init__(self):
@@ -117,6 +118,13 @@ class StockInfo:
 
     def get_price_history(self, ticker):
         return self.price_history.get(ticker, [])
+    
+    def save_to_json(self, filename="stock_data.json"): # Сохранение текущего состояния цен в JSON файл
+        with open(filename, "w", encoding="utf-8") as json_file:
+            json.dump(self.price_history, json_file, ensure_ascii=False, indent=4)
+        print(f"Stock data updated in {filename}")
+
+
 
 
 class Simulation:
@@ -142,6 +150,7 @@ class Simulation:
 
             for ticker, current_price in self.stock_market.display_stock_info().items():
                 self.stock_info.update_price(ticker, current_price)
+            self.stock_info.save_to_json()
 
         print("=== Simulation Complete ===")
         for ticker in self.stock_info.price_history:
