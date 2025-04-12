@@ -1,5 +1,6 @@
 import pygame
 import random
+import math
 
 """задача проекта архетиктура преокта, изпользование ООП, рефактиринга
 и струкруности кода, декораторов ошибок и исключений логика взаэмосвязенности класов.  гитхаба"""
@@ -18,11 +19,7 @@ class Tank:
         self.tank_transform_img = pygame.transform.scale(self.tank_img, self.new_size) #изменяем размер танка
         self.tank_img_rect = self.tank_transform_img.get_rect(center = (self.x, self.y)) #центр танка по оси x и y
         self.tank_img_rect.x = x
-        
-    def draw_tank(self, win):
-        """Рисует танк на игровом поле."""
-        win.blit(self.tank_transform_img, (self.x, self.y))
-    
+
     def move_tank(self, direction):
         """Двигает танк по оси x."""
         if pygame.key.get_pressed()[pygame.K_LEFT]:
@@ -31,7 +28,11 @@ class Tank:
             self.x += self.speed
         
         self.tank_img_rect.center = (self.x, self.y) #центр танка по оси x и y
- 
+        
+    def draw_tank(self, win):
+        """Рисует танк на игровом поле."""
+        win.blit(self.tank_transform_img, self.tank_img_rect)
+    
 
 class Field:
     """Создает игровое поле с заданными параметрами."""
@@ -57,22 +58,38 @@ class Field:
         
 
 class Cannon:
-    """Создает пушку с заданными параметрами."""
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.cannon_img = pygame.image.load("canon.png")
-        self.cannon_img = pygame.transform.scale(self.cannon_img, (self.cannon_img.get_width() // 4, self.cannon_img.get_height() // 4))
-        self.cannon_rect = self.cannon_img.get_rect()
-        self.cannon_rect.x = x
+    """Создает пушку, которая зависит от танка и управляется мышью."""
+    def __init__(self, tank):
+        self.tank = tank  # Пушка зависит от танка
+        self.angle = 0
+        self.max_angle = 45  # Ограничиваем вращение пушки на 45 градусов по обе стороны от центра (всего 90 градусов)
 
-    def updte_cannon(self, tank):
-        """Обновляет положение пушки."""
-        self.cannon_rect.center = (tank.x, tank.y - 50) #пушка будет находиться над танком
+        # Загружаем изображение пушки
+        self.cannon_img = pygame.image.load("canon.png")
+        self.cannon_img = pygame.transform.smoothscale(self.cannon_img, (100, 100))  # Настройка размера пушки
+        self.cannon_rect = self.cannon_img.get_rect(center=(self.tank.x, self.tank.y - 30))  
+
+    def update_cannon(self):
+        # Пушка двигается с танком
+        self.cannon_rect.center = (self.tank.x, self.tank.y - 30)  # Пушка всегда по центру танка, немного выше
+
+        # Угол между пушкой и мышью (для вращения пушки)
+        mx, my = pygame.mouse.get_pos()
+        dx = mx - self.tank.x
+        dy = my - self.tank.y
+        self.angle = math.degrees(math.atan2(dy, dx))
+
+        # Ограничиваем вращение пушки на 90 градусов (по 45 градусов в каждую сторону)
+        if self.angle > self.max_angle:
+            self.angle = self.max_angle
+        elif self.angle < -self.max_angle:
+            self.angle = -self.max_angle
 
     def draw_cannon(self, win):
-        """Рисует пушку на игровом поле."""
-        win.blit(self.cannon_img, (self.x, self.y))
+        # Вращаем пушку на основе угла
+        rotated_cannon = pygame.transform.rotate(self.cannon_img, self.angle)
+        rotated_cannon_rect = rotated_cannon.get_rect(center=self.cannon_rect.center)
+        win.blit(rotated_cannon, rotated_cannon_rect)
 
 class Target:
     pass
@@ -89,7 +106,7 @@ class GameRoundManager:
         self.field = Field(1280, 600)
         self.target = Target()
         self.bullet = Bullet()
-        self.cannon = Cannon(100, 400 - 50) #пушка будет находиться над танком
+        self.cannon = Cannon(self.tank) #пушка будет находиться над танком
 
         #Инициализация Pygame и создание окна
 
@@ -116,7 +133,7 @@ class GameRoundManager:
             self.field.draw_field(self.WIN)
             self.field.draw_border(self.tank, self.target, self.bullet)
             self.tank.draw_tank(self.WIN)
-            self.cannon.updte_cannon(self.tank)
+            self.cannon.update_cannon()
             self.cannon.draw_cannon(self.WIN)
             self.tank.move_tank(self.WIN)
             pygame.display.update()
