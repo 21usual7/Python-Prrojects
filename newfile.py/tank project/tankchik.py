@@ -2,10 +2,7 @@ import pygame
 import random
 import math
 
-"""задача проекта архетиктура преокта, изпользование ООП, рефактиринга
-и струкруности кода, декораторов ошибок и исключений логика взаэмосвязенности класов.  гитхаба"""
-
-#Constants variables
+# Constants variables
 WIDTH, HEIGHT = 1280, 600
 
 class Tank:
@@ -16,8 +13,8 @@ class Tank:
         self.speed = speed
         self.tank_img = pygame.image.load("tank.png")
         self.new_size = (self.tank_img.get_width() // 4, self.tank_img.get_height() // 4)
-        self.tank_transform_img = pygame.transform.scale(self.tank_img, self.new_size) #изменяем размер танка
-        self.tank_img_rect = self.tank_transform_img.get_rect(center = (self.x, self.y)) #центр танка по оси x и y
+        self.tank_transform_img = pygame.transform.scale(self.tank_img, self.new_size)  # изменяем размер танка
+        self.tank_img_rect = self.tank_transform_img.get_rect(center=(self.x, self.y))  # центр танка по оси x и y
         self.tank_img_rect.x = x
 
     def move_tank(self, direction):
@@ -27,7 +24,7 @@ class Tank:
         if pygame.key.get_pressed()[pygame.K_RIGHT]:
             self.x += self.speed
         
-        self.tank_img_rect.center = (self.x, self.y) #центр танка по оси x и y
+        self.tank_img_rect.center = (self.x, self.y)  # центр танка по оси x и y
         
     def draw_tank(self, win):
         """Рисует танк на игровом поле."""
@@ -48,13 +45,8 @@ class Field:
     
     def draw_border(self, tank, target, bullet):
         """Создает границы игрового поля."""
-        if tank.x < 0 or tank.x > self._width - tank.tank_img_rect.width: #проверяем выход за границы учитвая x првый танка и ширину танка
-            #если выход за границы то танк не может выйти за границы
+        if tank.x < 0 or tank.x > self._width - tank.tank_img_rect.width:  # проверяем выход за границы
             tank.x = max(0, min(tank.x, self._width - tank.tank_img_rect.width)) 
-        #if target.x < 0 or self.target.x > self._width - self.target.target_img_rect.width:
-           # target.x = max(0, min(self.target.x, self._width - self.target.target_img_rect.width))
-        #if bullet.x < 0 or bullet.x > self._width - bullet.bullet_img_rect.width:
-            #bullet.x = max(0, min(bullet.x, self._width - bullet.bullet_img_rect.width))
         
 
 class Cannon:
@@ -91,8 +83,25 @@ class Cannon:
         rotated_cannon_rect = rotated_cannon.get_rect(center=self.cannon_rect.center)
         win.blit(rotated_cannon, rotated_cannon_rect)
 
-class Target:
-    pass
+
+class Targets(pygame.sprite.Sprite):
+    def __init__(self, x, y, image, speed_x = 2):
+        super().__init__()
+        self.image = image
+        self.rect = self.image.get_rect(center=(x, y))
+        self.speed_x = speed_x  # скорость движения по оси X
+        self.direction = 1  # 1 - вправо, -1 - влево
+
+    def update(self):
+        # Изменяем позицию цели по оси X на основе скорости и направления
+        self.rect.x += self.speed_x * self.direction
+        
+        # Если цель выходит за пределы экрана, меняем направление
+        if self.rect.x <= 0 or self.rect.x >= WIDTH - self.rect.width:
+            self.direction *= -1  # меняем направление движения  # Убираем цель, если она выходит за экран
+
+    def draw(self, win):
+        win.blit(self.image, self.rect)  # Рисуем цель
 
 
 class Bullet:
@@ -100,48 +109,64 @@ class Bullet:
 
 
 class GameRoundManager:
-    """Управляет игровыми раундами, создает и запускает их, также создает танк и игровое поле с цельми."""
+    """Управляет игровыми раундами, создает и запускает их, также создает танк и игровое поле с целями."""
     def __init__(self):
-        self.tank = Tank(100, 400,  5)
-        self.field = Field(1280, 600)
-        self.target = Target()
+        self.tank = Tank(100, 400, 5)
+        self.field = Field(WIDTH, HEIGHT)
         self.bullet = Bullet()
-        self.cannon = Cannon(self.tank) #пушка будет находиться над танком
-
-        #Инициализация Pygame и создание окна
+        self.cannon = Cannon(self.tank)
 
         pygame.init()
         self.WIN = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("TANK GAME")
-
         self.clock = pygame.time.Clock()
         self.FPS = 60
         self.running = True
 
+        # 🎯 Загружаем картинки целей
+        self.filenames = [
+            "turret_targets0.png",
+            "turret_targets1.png",
+            "turret_targets2.png",
+        ]
+        self.target_images = [
+            pygame.transform.scale(pygame.image.load(name).convert_alpha(), (60, 60))
+            for name in self.filenames
+        ]
+
+        self.targets_group = pygame.sprite.Group()
+
+        # 🎯 Спавним все цели
+        target_positions = [(300, 50), (600, 100), (900, 150)]
+        for img, pos in zip(self.target_images, target_positions):
+            target = Targets(pos[0], pos[1], img)
+            self.targets_group.add(target)
+
     
     def main(self):
         while self.running:
-            #self.run_game_round()
             self.clock.tick(self.FPS)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
 
-            #Рисуем объект на экране
             self.WIN.fill((0, 0, 0))
             self.field.draw_field(self.WIN)
-            self.field.draw_border(self.tank, self.target, self.bullet)
+            self.field.draw_border(self.tank, None, self.bullet)
+            self.tank.move_tank(None)
             self.tank.draw_tank(self.WIN)
             self.cannon.update_cannon()
             self.cannon.draw_cannon(self.WIN)
-            self.tank.move_tank(self.WIN)
+
+            self.targets_group.update()
+            self.targets_group.draw(self.WIN)
+
             pygame.display.update()
+
         pygame.quit()
 
 
 if __name__ == "__main__":
     game = GameRoundManager()
     game.main()
-
-
