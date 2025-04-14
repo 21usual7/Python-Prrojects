@@ -85,7 +85,7 @@ class Cannon:
 
 
 class Targets(pygame.sprite.Sprite):
-    def __init__(self, x, y, image, speed_x = 2):
+    def __init__(self, x, y, image, speed_x = 1):
         super().__init__()
         self.image = image
         self.rect = self.image.get_rect(center=(x, y))
@@ -97,7 +97,7 @@ class Targets(pygame.sprite.Sprite):
         self.rect.x += self.speed_x * self.direction
         
         # Если цель выходит за пределы экрана, меняем направление
-        if self.rect.x <= 0 or self.rect.x >= WIDTH - self.rect.width:
+        if self.rect.x <= 0 or self.rect.x >= WIDTH - self.rect.width: 
             self.direction *= -1  # меняем направление движения  # Убираем цель, если она выходит за экран
 
     def draw(self, win):
@@ -105,6 +105,35 @@ class Targets(pygame.sprite.Sprite):
 
 
 class Bullet:
+    def __init__(self, x, y, angle, speed=5):
+        self.pos_x = x
+        self.pos_y = y
+        self.speed = speed
+
+        self.angle = angle
+        self.dir_x = math.cos(math.radians(angle))
+        self.dir_y = math.sin(math.radians(angle))
+
+        self.yadro_img = pygame.image.load("yadro.png")
+        self.yadro_img = pygame.transform.scale(self.yadro_img, (20, 20))
+        self.yadro_img_rect = self.yadro_img.get_rect(center=(x, y))
+
+        self.active = True
+
+    def update_bullet(self):
+        if not self.active:
+            return
+        self.pos_x += self.dir_x * self.speed
+        self.pos_y += self.dir_y * self.speed
+        self.yadro_img_rect.center = (self.pos_x, self.pos_y)
+
+    def draw_bullet(self, win):
+        if self.active:
+            win.blit(self.yadro_img, self.yadro_img_rect)
+
+
+
+class EnemyBullet:
     pass
 
 
@@ -113,7 +142,6 @@ class GameRoundManager:
     def __init__(self):
         self.tank = Tank(100, 400, 5)
         self.field = Field(WIDTH, HEIGHT)
-        self.bullet = Bullet()
         self.cannon = Cannon(self.tank)
 
         pygame.init()
@@ -142,23 +170,44 @@ class GameRoundManager:
             target = Targets(pos[0], pos[1], img)
             self.targets_group.add(target)
 
-    
+        # Список пуль
+        self.bullets = []
+
     def main(self):
         while self.running:
             self.clock.tick(self.FPS)
 
+            # Обрабатываем события
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Левая кнопка мыши
+                    cx, cy = self.cannon.cannon_rect.center
+                    angle = self.cannon.angle
+                    new_bullet = Bullet(cx, cy, angle)
+                    self.bullets.append(new_bullet)
 
+            # Обновляем экран
             self.WIN.fill((0, 0, 0))
             self.field.draw_field(self.WIN)
-            self.field.draw_border(self.tank, None, self.bullet)
+            self.field.draw_border(self.tank, None, None)
+
+            # Двигаем и рисуем танк
             self.tank.move_tank(None)
             self.tank.draw_tank(self.WIN)
+
+            # Обновляем и рисуем пушку
             self.cannon.update_cannon()
             self.cannon.draw_cannon(self.WIN)
 
+            # Обновляем и рисуем пули
+            for bullet in self.bullets[:]:
+                bullet.update_bullet()
+                bullet.draw_bullet(self.WIN)
+                if not bullet.active or bullet.pos_x < 0 or bullet.pos_x > WIDTH or bullet.pos_y < 0 or bullet.pos_y > HEIGHT:
+                    self.bullets.remove(bullet)
+
+            # Обновляем цели
             self.targets_group.update()
             self.targets_group.draw(self.WIN)
 
