@@ -5,6 +5,7 @@ import math
 # Constants variables
 WIDTH, HEIGHT = 1280, 600
 
+
 class Tank:
     """Создает танк с заданными параметрами и методами."""
     def __init__(self, x, y, speed):
@@ -29,7 +30,6 @@ class Tank:
     def draw_tank(self, win):
         """Рисует танк на игровом поле."""
         win.blit(self.tank_transform_img, self.tank_img_rect)
-    
 
 class Field:
     """Создает игровое поле с заданными параметрами."""
@@ -43,11 +43,16 @@ class Field:
         """Рисует игровое поле."""
         win.blit(self.ground_img, (0, 0))
     
-    def draw_border(self, tank, target, bullet):
+    def draw_border(self, tank, bullets):
         """Создает границы игрового поля."""
         if tank.x < 0 or tank.x > self._width - tank.tank_img_rect.width:  # проверяем выход за границы
-            tank.x = max(0, min(tank.x, self._width - tank.tank_img_rect.width)) 
+            tank.x = max(0, min(tank.x, self._width - tank.tank_img_rect.width))
         
+        # Проверяем выход пули за границы
+        for bullet in bullets:
+            if bullet.pos_x < 0 or bullet.pos_x > self._width - bullet.yadro_img_rect.width:
+                bullet.active = False
+
 
 class Cannon:
     """Создает пушку, которая зависит от танка и управляется мышью."""
@@ -85,7 +90,7 @@ class Cannon:
 
 
 class Targets(pygame.sprite.Sprite):
-    def __init__(self, x, y, image, speed_x = 1):
+    def __init__(self, x, y, image, speed_x=1):
         super().__init__()
         self.image = image
         self.rect = self.image.get_rect(center=(x, y))
@@ -102,6 +107,8 @@ class Targets(pygame.sprite.Sprite):
 
     def draw(self, win):
         win.blit(self.image, self.rect)  # Рисуем цель
+    
+    
 
 
 class Bullet:
@@ -110,10 +117,12 @@ class Bullet:
         self.pos_y = y
         self.speed = speed
 
+        # Angle
         self.angle = angle
         self.dir_x = math.cos(math.radians(angle))
         self.dir_y = math.sin(math.radians(angle))
 
+        # PNG
         self.yadro_img = pygame.image.load("yadro.png")
         self.yadro_img = pygame.transform.scale(self.yadro_img, (20, 20))
         self.yadro_img_rect = self.yadro_img.get_rect(center=(x, y))
@@ -121,29 +130,38 @@ class Bullet:
         self.active = True
 
     def update_bullet(self):
+        """Получение координат и угла полета"""
         if not self.active:
             return
         self.pos_x += self.dir_x * self.speed
         self.pos_y += self.dir_y * self.speed
         self.yadro_img_rect.center = (self.pos_x, self.pos_y)
 
+    def check_collision(self, target_group):
+        for target in target_group:
+            if self.yadro_img_rect.colliderect(target.rect):
+                self.active = False
+                target.kill()
+                return True
+        return False
+    
+    def is_off_screen(self):
+        return self.x < 0 or self.x > WIDTH or self.y < 0 or self.y > HEIGHT
+
     def draw_bullet(self, win):
         if self.active:
             win.blit(self.yadro_img, self.yadro_img_rect)
 
 
-
-class EnemyBullet:
-    pass
-
-
 class GameRoundManager:
     """Управляет игровыми раундами, создает и запускает их, также создает танк и игровое поле с целями."""
     def __init__(self):
-        self.tank = Tank(100, 400, 5)
+        # Создание экземпляров классов
+        self.tank = Tank(100, 400, 2)
         self.field = Field(WIDTH, HEIGHT)
         self.cannon = Cannon(self.tank)
 
+        # Инициализация Pygame
         pygame.init()
         self.WIN = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("TANK GAME")
@@ -151,12 +169,19 @@ class GameRoundManager:
         self.FPS = 60
         self.running = True
 
+        #FONT
+        self.font = pygame.font.SysFont("Arial", 30)
+
+        #Varibles
+        self.score = 0
+
         # 🎯 Загружаем картинки целей
         self.filenames = [
             "turret_targets0.png",
             "turret_targets1.png",
             "turret_targets2.png",
         ]
+        # Уменьшение каждого изображения
         self.target_images = [
             pygame.transform.scale(pygame.image.load(name).convert_alpha(), (60, 60))
             for name in self.filenames
@@ -165,13 +190,17 @@ class GameRoundManager:
         self.targets_group = pygame.sprite.Group()
 
         # 🎯 Спавним все цели
-        target_positions = [(300, 50), (600, 100), (900, 150)]
+        target_positions = [(300, 50), (600, 100), (900, 150)] 
         for img, pos in zip(self.target_images, target_positions):
             target = Targets(pos[0], pos[1], img)
             self.targets_group.add(target)
 
         # Список пуль
         self.bullets = []
+
+    def draw_score(self):
+        score_text = self.font.render(f"Score: {self.score}", True, (255, 255, 255))
+        self.WIN.blit(score_text, (20, 20))
 
     def main(self):
         while self.running:
@@ -181,16 +210,17 @@ class GameRoundManager:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Левая кнопка мыши
-                    cx, cy = self.cannon.cannon_rect.center
-                    angle = self.cannon.angle
-                    new_bullet = Bullet(cx, cy, angle)
-                    self.bullets.append(new_bullet)
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if not any(b.active for b in self.bullets):  # 🔥 нет активных пуль
+                        cx, cy = self.cannon.cannon_rect.center
+                        angle = self.cannon.angle
+                        new_bullet = Bullet(cx, cy, angle)
+                        self.bullets.append(new_bullet)
 
             # Обновляем экран
             self.WIN.fill((0, 0, 0))
             self.field.draw_field(self.WIN)
-            self.field.draw_border(self.tank, None, None)
+            self.field.draw_border(self.tank, self.bullets)
 
             # Двигаем и рисуем танк
             self.tank.move_tank(None)
@@ -204,17 +234,35 @@ class GameRoundManager:
             for bullet in self.bullets[:]:
                 bullet.update_bullet()
                 bullet.draw_bullet(self.WIN)
+                if bullet.check_collision(self.targets_group):
+                    self.score += 1
                 if not bullet.active or bullet.pos_x < 0 or bullet.pos_x > WIDTH or bullet.pos_y < 0 or bullet.pos_y > HEIGHT:
                     self.bullets.remove(bullet)
+            
+            used_positions = set()
 
-            # Обновляем цели
+             #Респавн целей       
+            while len(self.targets_group) < 3:
+                x = random.randint(50, 300)  # ширина: от 50 до 300
+                y = random.randint(50, 150)  # высота: от 50 до 150 (или другое логичное значение)
+                speed = random.uniform(1, 3)
+                if (x, y) in used_positions:
+                    continue
+
+                used_positions.add((x, y))
+                img = random.choice(self.target_images)
+                self.targets_group.add(Targets(x, y, img, speed))
+
             self.targets_group.update()
             self.targets_group.draw(self.WIN)
+
+
+            self.draw_score()
+
 
             pygame.display.update()
 
         pygame.quit()
-
 
 if __name__ == "__main__":
     game = GameRoundManager()
