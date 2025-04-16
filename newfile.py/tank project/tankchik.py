@@ -11,13 +11,14 @@ class Tank:
     def __init__(self, x, y, speed):
         self.x = x
         self.y = y
-        self._tank_hp = 100
         self.speed = speed
+        self.tank_hp = 100
         self.tank_img = pygame.image.load("tank.png")
         self._new_size = (self.tank_img.get_width() // 5, self.tank_img.get_height() // 5)
         self.tank_transform_img = pygame.transform.scale(self.tank_img, self._new_size)  # изменяем размер танка
         self.tank_img_rect = self.tank_transform_img.get_rect(center=(self.x, self.y))  # центр танка по оси x и y
         self.tank_img_rect.x = x
+
 
     def move_tank(self):
         """Двигает танк по оси x."""
@@ -175,8 +176,14 @@ class EnemyBullet(pygame.sprite.Sprite):
         self.y += self.dir_y * self.speed
         self._yadro_img_rect.center = (self.x, self.y)
 
-    def draw_enemy_bullet(self, win, acitve:bool):
-        if self.active:
+    def cheack_for_collide(self, tank):
+        if self._yadro_img_rect.colliderect(tank):
+            self.kill()
+            return True
+        return False
+
+    def draw_enemy_bullet(self, win, active: bool):
+        if active:
             win.blit(self._yadro_img, self._yadro_img_rect)    
 
 
@@ -201,6 +208,8 @@ class GameRoundManager:
 
         #Varibles
         self.score = 0
+        self.enemy_bullets = []
+        self.bullets = []
 
         # 🎯 Загружаем картинки целей
         self.filenames = [
@@ -223,11 +232,21 @@ class GameRoundManager:
             self.targets_group.add(target)
 
         # Список пуль
-        self.bullets = []
 
     def draw_score(self):
         score_text = self.font.render(f"Score: {self.score}", True, (255, 255, 255))
         self.WIN.blit(score_text, (20, 20))
+
+    def retaliate_fire(self):
+        if len(self.targets_group) == 0:
+            return
+        
+        target = random.choice(self.targets_group.sprites())
+        enemy_bullet = EnemyBullet(
+            x=target.rect.centerx,
+            y=target.rect.centery,
+            t_pos=(self.tank.x, self.tank.y),)
+        self.enemy_bullets.append(enemy_bullet)
 
     def main(self):
         while self.running:
@@ -243,6 +262,7 @@ class GameRoundManager:
                         angle = self.cannon.angle
                         new_bullet = Bullet(cx, cy, angle)
                         self.bullets.append(new_bullet)
+                        self.retaliate_fire()
 
             # Обновляем экран
             self.WIN.fill((0, 0, 0))
@@ -272,7 +292,7 @@ class GameRoundManager:
 
             used_positions = set()
 
-             #Респавн целей       
+            #Респавн целей       
             while len(self.targets_group) < 3: #изначально три цели, если группа становиться меньше значит начинаем добавлять новую пнг с новими кординатами
                 x = random.randint(50, 300)  
                 y = random.randint(50, 150)  
@@ -283,6 +303,19 @@ class GameRoundManager:
                 used_positions.add((x, y))
                 img = random.choice(self.target_images)
                 self.targets_group.add(Targets(x, y, img, speed))
+            
+            self.enemy_bullets_group = pygame.sprite.Group()
+
+            #создаем вражеские пули
+            for eb in self.enemy_bullets:
+                eb.update_enemy_bullet(active=True)
+                eb.draw_enemy_bullet(self.WIN, active=True)
+                if eb.cheack_for_collide(self.tank.tank_img_rect):
+                    eb.kill()
+                    self.tank.tank_hp -= 1
+                    if self.tank.tank_hp <= 0:
+                        self.running = False
+                
 
             self.targets_group.update()
             self.targets_group.draw(self.WIN)
