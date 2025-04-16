@@ -13,16 +13,16 @@ class Tank:
         self.y = y
         self.speed = speed
         self.tank_img = pygame.image.load("tank.png")
-        self.new_size = (self.tank_img.get_width() // 4, self.tank_img.get_height() // 4)
+        self.new_size = (self.tank_img.get_width() // 5, self.tank_img.get_height() // 5)
         self.tank_transform_img = pygame.transform.scale(self.tank_img, self.new_size)  # изменяем размер танка
         self.tank_img_rect = self.tank_transform_img.get_rect(center=(self.x, self.y))  # центр танка по оси x и y
         self.tank_img_rect.x = x
 
-    def move_tank(self, direction):
+    def move_tank(self):
         """Двигает танк по оси x."""
-        if pygame.key.get_pressed()[pygame.K_LEFT]:
+        if pygame.key.get_pressed()[pygame.K_a]:
             self.x -= self.speed
-        if pygame.key.get_pressed()[pygame.K_RIGHT]:
+        if pygame.key.get_pressed()[pygame.K_d]:
             self.x += self.speed
         
         self.tank_img_rect.center = (self.x, self.y)  # центр танка по оси x и y
@@ -31,39 +31,44 @@ class Tank:
         """Рисует танк на игровом поле."""
         win.blit(self.tank_transform_img, self.tank_img_rect)
 
+
 class Field:
     """Создает игровое поле с заданными параметрами."""
     def __init__(self, width, height):
         self._width = width
         self._height = height
-        self.ground_img = pygame.image.load("ground.png")
-        self.ground_img = pygame.transform.scale(self.ground_img, (self._width, self._height))
+        self.filed_img = pygame.image.load("ground.png")
+        self.field_img = pygame.transform.scale(self.filed_img, (self._width, self._height))
     
     def draw_field(self, win):
         """Рисует игровое поле."""
-        win.blit(self.ground_img, (0, 0))
+        win.blit(self.field_img, (0, 0))
     
-    def draw_border(self, tank, bullets):
+    def draw_border(self, tank:Tank):
         """Создает границы игрового поля."""
         if tank.x < 0 or tank.x > self._width - tank.tank_img_rect.width:  # проверяем выход за границы
             tank.x = max(0, min(tank.x, self._width - tank.tank_img_rect.width))
         
-        # Проверяем выход пули за границы
-        for bullet in bullets:
-            if bullet.pos_x < 0 or bullet.pos_x > self._width - bullet.yadro_img_rect.width:
+    def remove_offscreen_bullets(self, bullets):
+         for bullet in bullets[:]:
+            if bullet.pos_x < 0 or bullet.pos_x > self._width or bullet.pos_y < 0 or bullet.pos_y > self._height:
                 bullet.active = False
+    
+    def change_targets_direction_if_needed(self, target):
+       if target.rect.left <= 0 or target.rect.right >= self._width:
+            target.speed_x *= -1
 
 
 class Cannon:
     """Создает пушку, которая зависит от танка и управляется мышью."""
-    def __init__(self, tank):
+    def __init__(self, tank:Tank):
         self.tank = tank  # Пушка зависит от танка
         self.angle = 0
         self.max_angle = 45  # Ограничиваем вращение пушки на 45 градусов по обе стороны от центра (всего 90 градусов)
 
         # Загружаем изображение пушки
         self.cannon_img = pygame.image.load("canon.png")
-        self.cannon_img = pygame.transform.smoothscale(self.cannon_img, (100, 100))  # Настройка размера пушки
+        self.cannon_img = pygame.transform.smoothscale(self.cannon_img, (60, 60))  # Настройка размера пушки
         self.cannon_rect = self.cannon_img.get_rect(center=(self.tank.x, self.tank.y - 30))  
 
     def update_cannon(self):
@@ -76,15 +81,9 @@ class Cannon:
         dy = my - self.tank.y
         self.angle = math.degrees(math.atan2(dy, dx))
 
-        # Ограничиваем вращение пушки на 90 градусов (по 45 градусов в каждую сторону)
-        if self.angle > self.max_angle:
-            self.angle = self.max_angle
-        elif self.angle < -self.max_angle:
-            self.angle = -self.max_angle
-
     def draw_cannon(self, win):
         # Вращаем пушку на основе угла
-        rotated_cannon = pygame.transform.rotate(self.cannon_img, self.angle)
+        rotated_cannon = pygame.transform.rotate(self.cannon_img, -self.angle)  # инвертируем угол, так как pygame работает по-другому
         rotated_cannon_rect = rotated_cannon.get_rect(center=self.cannon_rect.center)
         win.blit(rotated_cannon, rotated_cannon_rect)
 
@@ -100,18 +99,13 @@ class Targets(pygame.sprite.Sprite):
     def update(self):
         # Изменяем позицию цели по оси X на основе скорости и направления
         self.rect.x += self.speed_x * self.direction
-        
-        # Если цель выходит за пределы экрана, меняем направление
-        if self.rect.x <= 0 or self.rect.x >= WIDTH - self.rect.width: 
-            self.direction *= -1  # меняем направление движения  # Убираем цель, если она выходит за экран
 
     def draw(self, win):
         win.blit(self.image, self.rect)  # Рисуем цель
     
-    
-
 
 class Bullet:
+    """Спавнит пули танчка"""
     def __init__(self, x, y, angle, speed=5):
         self.pos_x = x
         self.pos_y = y
@@ -144,20 +138,22 @@ class Bullet:
                 target.kill()
                 return True
         return False
-    
-    def is_off_screen(self):
-        return self.x < 0 or self.x > WIDTH or self.y < 0 or self.y > HEIGHT
 
     def draw_bullet(self, win):
         if self.active:
             win.blit(self.yadro_img, self.yadro_img_rect)
 
 
+class EnemyBullet(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        
+
 class GameRoundManager:
     """Управляет игровыми раундами, создает и запускает их, также создает танк и игровое поле с целями."""
     def __init__(self):
         # Создание экземпляров классов
-        self.tank = Tank(100, 400, 2)
+        self.tank = Tank(x=100, y=400, speed =2)
         self.field = Field(WIDTH, HEIGHT)
         self.cannon = Cannon(self.tank)
 
@@ -211,7 +207,7 @@ class GameRoundManager:
                 if event.type == pygame.QUIT:
                     self.running = False
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if not any(b.active for b in self.bullets):  # 🔥 нет активных пуль
+                    if not any(b.active for b in self.bullets):  # нет активных пуль
                         cx, cy = self.cannon.cannon_rect.center
                         angle = self.cannon.angle
                         new_bullet = Bullet(cx, cy, angle)
@@ -220,10 +216,13 @@ class GameRoundManager:
             # Обновляем экран
             self.WIN.fill((0, 0, 0))
             self.field.draw_field(self.WIN)
-            self.field.draw_border(self.tank, self.bullets)
+            self.field.draw_border(self.tank)
+            
+            for target in self.targets_group: #меняем траекторию целей если они соприкасаються с границей поля
+                self.field.change_targets_direction_if_needed(target)
 
             # Двигаем и рисуем танк
-            self.tank.move_tank(None)
+            self.tank.move_tank()
             self.tank.draw_tank(self.WIN)
 
             # Обновляем и рисуем пушку
@@ -233,18 +232,19 @@ class GameRoundManager:
             # Обновляем и рисуем пули
             for bullet in self.bullets[:]:
                 bullet.update_bullet()
+                if not bullet.active:
+                    self.bullets.remove(bullet)
                 bullet.draw_bullet(self.WIN)
                 if bullet.check_collision(self.targets_group):
                     self.score += 1
-                if not bullet.active or bullet.pos_x < 0 or bullet.pos_x > WIDTH or bullet.pos_y < 0 or bullet.pos_y > HEIGHT:
-                    self.bullets.remove(bullet)
-            
+            self.field.remove_offscreen_bullets(self.bullets)
+
             used_positions = set()
 
              #Респавн целей       
-            while len(self.targets_group) < 3:
-                x = random.randint(50, 300)  # ширина: от 50 до 300
-                y = random.randint(50, 150)  # высота: от 50 до 150 (или другое логичное значение)
+            while len(self.targets_group) < 3: #изначально три цели, если группа становиться меньше значит начинаем добавлять новую пнг с новими кординатами
+                x = random.randint(50, 300)  
+                y = random.randint(50, 150)  
                 speed = random.uniform(1, 3)
                 if (x, y) in used_positions:
                     continue
@@ -255,10 +255,7 @@ class GameRoundManager:
 
             self.targets_group.update()
             self.targets_group.draw(self.WIN)
-
-
             self.draw_score()
-
 
             pygame.display.update()
 
