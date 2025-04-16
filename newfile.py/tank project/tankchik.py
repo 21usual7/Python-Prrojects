@@ -5,6 +5,10 @@ import math
 # Constants variables
 WIDTH, HEIGHT = 1280, 600
 
+#COLORS
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+
 
 class Tank:
     """Создает танк с заданными параметрами и методами."""
@@ -14,7 +18,7 @@ class Tank:
         self.speed = speed
         self.tank_hp = 100
         self.tank_img = pygame.image.load("tank.png")
-        self._new_size = (self.tank_img.get_width() // 5, self.tank_img.get_height() // 5)
+        self._new_size = (self.tank_img.get_width() // 7, self.tank_img.get_height() // 7)
         self.tank_transform_img = pygame.transform.scale(self.tank_img, self._new_size)  # изменяем размер танка
         self.tank_img_rect = self.tank_transform_img.get_rect(center=(self.x, self.y))  # центр танка по оси x и y
         self.tank_img_rect.x = x
@@ -52,9 +56,15 @@ class Field:
             tank.x = max(0, min(tank.x, self._width - tank.tank_img_rect.width))
         
     def remove_offscreen_bullets(self, bullets):
-         for bullet in bullets[:]:
+         for bullet in bullets[:]: #для пулей танка
             if bullet.pos_x < 0 or bullet.pos_x > self._width or bullet.pos_y < 0 or bullet.pos_y > self._height:
                 bullet.active = False
+
+    def remove_offscren_enemy_bullets(self, enemy_bullets):
+        #для пулей врага
+         for eb in enemy_bullets[:]:
+                if eb.x < 0 or eb.x > self._width or eb.y < 0 or eb.y > self._height:
+                    eb.active = False
     
     def change_targets_direction_if_needed(self, target):
        if target.rect.left <= 0 or target.rect.right >= self._width:
@@ -146,12 +156,13 @@ class Bullet:
             win.blit(self.yadro_img, self.yadro_img_rect)
 
 
-class EnemyBullet(pygame.sprite.Sprite):
+class EnemyBullet():
+    """Создает вражеские пули"""
     def __init__(self, x, y, t_pos, angle=None, speed=5):
-        super().__init__()
         self.x = x
         self.y = y
         self.speed = speed
+        self.active = True
         
         # Цель
         self.t_x, self.t_y = t_pos
@@ -169,21 +180,21 @@ class EnemyBullet(pygame.sprite.Sprite):
         self._yadro_img = pygame.transform.scale(self._yadro_img, (20, 20))
         self._yadro_img_rect = self._yadro_img.get_rect(center=(x, y))
 
-    def update_enemy_bullet(self, active: bool):
-        if not active:
+    def update_enemy_bullet(self):
+        if not self.active:
             return 
         self.x += self.dir_x * self.speed
         self.y += self.dir_y * self.speed
         self._yadro_img_rect.center = (self.x, self.y)
 
-    def cheack_for_collide(self, tank):
+    def cheack_for_collide(self, tank, enemy_bullets):
         if self._yadro_img_rect.colliderect(tank):
-            self.kill()
+            enemy_bullets.remove(self)
             return True
         return False
 
-    def draw_enemy_bullet(self, win, active: bool):
-        if active:
+    def draw_enemy_bullet(self, win):
+        if self.active:
             win.blit(self._yadro_img, self._yadro_img_rect)    
 
 
@@ -205,11 +216,13 @@ class GameRoundManager:
 
         #FONT
         self.font = pygame.font.SysFont("Arial", 30)
+        self.font_lose = pygame.font.SysFont("Arial", 60)
 
         #Varibles
         self.score = 0
         self.enemy_bullets = []
         self.bullets = []
+        game_over = False
 
         # 🎯 Загружаем картинки целей
         self.filenames = [
@@ -247,6 +260,14 @@ class GameRoundManager:
             y=target.rect.centery,
             t_pos=(self.tank.x, self.tank.y),)
         self.enemy_bullets.append(enemy_bullet)
+    
+    def draw_hp(self):
+        hp_text = self.font.render(f"HP: {self.tank.tank_hp}", True, WHITE)
+        self.WIN.blit(hp_text, (600, 20))
+
+    def draw_lose(self):
+        lose_text = self.font_lose.render(f"YOU LOSE", True, WHITE)
+        self.WIN.blit(lose_text, (600, 20))
 
     def main(self):
         while self.running:
@@ -304,22 +325,24 @@ class GameRoundManager:
                 img = random.choice(self.target_images)
                 self.targets_group.add(Targets(x, y, img, speed))
             
-            self.enemy_bullets_group = pygame.sprite.Group()
-
             #создаем вражеские пули
             for eb in self.enemy_bullets:
-                eb.update_enemy_bullet(active=True)
-                eb.draw_enemy_bullet(self.WIN, active=True)
-                if eb.cheack_for_collide(self.tank.tank_img_rect):
-                    eb.kill()
-                    self.tank.tank_hp -= 1
+                eb.update_enemy_bullet()
+                eb.draw_enemy_bullet(self.WIN)
+                if eb.cheack_for_collide(self.tank.tank_img_rect, self.enemy_bullets):
+                    self.tank.tank_hp -= 100
                     if self.tank.tank_hp <= 0:
-                        self.running = False
+                        self.WIN.fill(WHITE)
+                        self.draw_lose()
+                        
+                        
                 
-
+            self.field.remove_offscren_enemy_bullets(self.enemy_bullets)
             self.targets_group.update()
             self.targets_group.draw(self.WIN)
             self.draw_score()
+            self.draw_hp()
+           
 
             pygame.display.update()
 
