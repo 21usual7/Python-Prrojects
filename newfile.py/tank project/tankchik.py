@@ -11,10 +11,11 @@ class Tank:
     def __init__(self, x, y, speed):
         self.x = x
         self.y = y
+        self._tank_hp = 100
         self.speed = speed
         self.tank_img = pygame.image.load("tank.png")
-        self.new_size = (self.tank_img.get_width() // 5, self.tank_img.get_height() // 5)
-        self.tank_transform_img = pygame.transform.scale(self.tank_img, self.new_size)  # изменяем размер танка
+        self._new_size = (self.tank_img.get_width() // 5, self.tank_img.get_height() // 5)
+        self.tank_transform_img = pygame.transform.scale(self.tank_img, self._new_size)  # изменяем размер танка
         self.tank_img_rect = self.tank_transform_img.get_rect(center=(self.x, self.y))  # центр танка по оси x и y
         self.tank_img_rect.x = x
 
@@ -145,9 +146,39 @@ class Bullet:
 
 
 class EnemyBullet(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, x, y, t_pos, angle=None, speed=5):
         super().__init__()
+        self.x = x
+        self.y = y
+        self.speed = speed
         
+        # Цель
+        self.t_x, self.t_y = t_pos
+        
+        # Правильное направление на цель
+        dx = self.t_x - self.x
+        dy = self.t_y - self.y
+        angle= math.atan2(dy, dx)
+
+        self.dir_x = math.cos(angle)
+        self.dir_y = math.sin(angle)
+
+        # Загрузка изображения
+        self._yadro_img = pygame.image.load("yadro.png").convert_alpha()
+        self._yadro_img = pygame.transform.scale(self._yadro_img, (20, 20))
+        self._yadro_img_rect = self._yadro_img.get_rect(center=(x, y))
+
+    def update_enemy_bullet(self, active: bool):
+        if not active:
+            return 
+        self.x += self.dir_x * self.speed
+        self.y += self.dir_y * self.speed
+        self._yadro_img_rect.center = (self.x, self.y)
+
+    def draw_enemy_bullet(self, win, acitve:bool):
+        if self.active:
+            win.blit(self._yadro_img, self._yadro_img_rect)    
+
 
 class GameRoundManager:
     """Управляет игровыми раундами, создает и запускает их, также создает танк и игровое поле с целями."""
