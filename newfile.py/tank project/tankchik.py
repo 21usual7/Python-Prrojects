@@ -9,7 +9,6 @@ WIDTH, HEIGHT = 1280, 600
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 
-
 class Tank:
     """Создает танк с заданными параметрами и методами."""
     def __init__(self, x, y, speed):
@@ -101,6 +100,7 @@ class Cannon:
 
 
 class Targets(pygame.sprite.Sprite):
+    """Создает спрайты тарегтов"""
     def __init__(self, x, y, image, speed_x=1):
         super().__init__()
         self.image = image
@@ -216,25 +216,24 @@ class GameRoundManager:
 
         #FONT
         self.font = pygame.font.SysFont("Arial", 30)
-        self.font_lose = pygame.font.SysFont("Arial", 60)
+        self.font_bold = pygame.font.SysFont("Arial", 60)
 
         #Varibles
         self.score = 0
         self.enemy_bullets = []
         self.bullets = []
-        game_over = False
+        self.game_over = False
+        self.cheack_win = False
 
         # 🎯 Загружаем картинки целей
         self.filenames = [
             "turret_targets0.png",
             "turret_targets1.png",
-            "turret_targets2.png",
-        ]
+            "turret_targets2.png",]
         # Уменьшение каждого изображения
         self.target_images = [
             pygame.transform.scale(pygame.image.load(name).convert_alpha(), (60, 60))
-            for name in self.filenames
-        ]
+            for name in self.filenames]
 
         self.targets_group = pygame.sprite.Group()
 
@@ -244,8 +243,7 @@ class GameRoundManager:
             target = Targets(pos[0], pos[1], img)
             self.targets_group.add(target)
 
-        # Список пуль
-
+    #ФУНКЦИИ
     def draw_score(self):
         score_text = self.font.render(f"Score: {self.score}", True, (255, 255, 255))
         self.WIN.blit(score_text, (20, 20))
@@ -265,86 +263,130 @@ class GameRoundManager:
         hp_text = self.font.render(f"HP: {self.tank.tank_hp}", True, WHITE)
         self.WIN.blit(hp_text, (600, 20))
 
+    def cheack_for_lose(self):
+        if self.tank.tank_hp <= 0:
+            self.game_over = True
+
     def draw_lose(self):
-        lose_text = self.font_lose.render(f"YOU LOSE", True, WHITE)
-        self.WIN.blit(lose_text, (600, 20))
+            lose_text = self.font_bold.render(f"YOU LOSE", True, BLACK)
+            self.WIN.blit(lose_text, (WIDTH//2 - 120, HEIGHT//2 - 60))
+
+    def cheack_for_win(self):
+        if self.score >= 20:
+            self.cheack_win = True
+            self.game_over = True
+            self.tank.tank_hp + 20
+
+    def draw_win(self):
+        win_text = self.font_bold.render(f"YOU WIN!", True, BLACK)
+        self.WIN.blit(win_text, (WIDTH//2 - 120, HEIGHT//2 - 60))
+
+    def restart_game(self):
+    # Сбрасываем все переменные к исходным значениям
+        self.score = 0
+        self.tank = Tank(x=100, y=400, speed=2)
+        self.cannon = Cannon(self.tank)
+        self.targets_group.empty()
+        target_positions = [(300, 50), (600, 100), (900, 150)]
+        for img, pos in zip(self.target_images, target_positions):
+            target = Targets(pos[0], pos[1], img)
+            self.targets_group.add(target)
+        self.bullets = []
+        self.enemy_bullets = []
+        self.tank.tank_hp = 100
+        self.game_over = False
 
     def main(self):
         while self.running:
             self.clock.tick(self.FPS)
-
-            # Обрабатываем события
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if not any(b.active for b in self.bullets):  # нет активных пуль
-                        cx, cy = self.cannon.cannon_rect.center
-                        angle = self.cannon.angle
-                        new_bullet = Bullet(cx, cy, angle)
-                        self.bullets.append(new_bullet)
-                        self.retaliate_fire()
-
-            # Обновляем экран
+             # Обновляем экран
             self.WIN.fill((0, 0, 0))
             self.field.draw_field(self.WIN)
             self.field.draw_border(self.tank)
-            
-            for target in self.targets_group: #меняем траекторию целей если они соприкасаються с границей поля
-                self.field.change_targets_direction_if_needed(target)
 
-            # Двигаем и рисуем танк
+             # Двигаем и рисуем танк
             self.tank.move_tank()
             self.tank.draw_tank(self.WIN)
 
-            # Обновляем и рисуем пушку
-            self.cannon.update_cannon()
-            self.cannon.draw_cannon(self.WIN)
-
-            # Обновляем и рисуем пули
-            for bullet in self.bullets[:]:
-                bullet.update_bullet()
-                if not bullet.active:
-                    self.bullets.remove(bullet)
-                bullet.draw_bullet(self.WIN)
-                if bullet.check_collision(self.targets_group):
-                    self.score += 1
-            self.field.remove_offscreen_bullets(self.bullets)
-
-            used_positions = set()
-
-            #Респавн целей       
-            while len(self.targets_group) < 3: #изначально три цели, если группа становиться меньше значит начинаем добавлять новую пнг с новими кординатами
-                x = random.randint(50, 300)  
-                y = random.randint(50, 150)  
-                speed = random.uniform(1, 3)
-                if (x, y) in used_positions:
-                    continue
-
-                used_positions.add((x, y))
-                img = random.choice(self.target_images)
-                self.targets_group.add(Targets(x, y, img, speed))
-            
-            #создаем вражеские пули
-            for eb in self.enemy_bullets:
-                eb.update_enemy_bullet()
-                eb.draw_enemy_bullet(self.WIN)
-                if eb.cheack_for_collide(self.tank.tank_img_rect, self.enemy_bullets):
-                    self.tank.tank_hp -= 100
-                    if self.tank.tank_hp <= 0:
-                        self.WIN.fill(WHITE)
-                        self.draw_lose()
-                        
-                        
+            if self.game_over:
+                self.WIN.fill(WHITE)
+                if not self.cheack_win:
+                    self.draw_lose()
+                else:
+                    self.draw_win()
+                pygame.display.update()
                 
-            self.field.remove_offscren_enemy_bullets(self.enemy_bullets)
-            self.targets_group.update()
-            self.targets_group.draw(self.WIN)
-            self.draw_score()
-            self.draw_hp()
-           
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.running = False
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        self.restart_game()
+                
+            else:
 
-            pygame.display.update()
+                # Обрабатываем события
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.running = False
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        if not any(b.active for b in self.bullets):  # нет активных пуль
+                            cx, cy = self.cannon.cannon_rect.center
+                            angle = self.cannon.angle
+                            new_bullet = Bullet(cx, cy, angle)
+                            self.bullets.append(new_bullet)
+                            self.retaliate_fire()
+                
+                for target in self.targets_group: #меняем траекторию целей если они соприкасаються с границей поля
+                    self.field.change_targets_direction_if_needed(target)
+
+                # Двигаем и рисуем танк
+                self.tank.move_tank()
+                self.tank.draw_tank(self.WIN)
+
+                # Обновляем и рисуем пушку
+                self.cannon.update_cannon()
+                self.cannon.draw_cannon(self.WIN)
+
+                # Обновляем и рисуем пули
+                for bullet in self.bullets[:]:
+                    bullet.update_bullet()
+                    if not bullet.active:
+                        self.bullets.remove(bullet)
+                    bullet.draw_bullet(self.WIN)
+                    if bullet.check_collision(self.targets_group):
+                        self.score += 1
+                        self.cheack_for_win()
+                self.field.remove_offscreen_bullets(self.bullets)
+
+                used_positions = set()
+
+                #Респавн целей       
+                while len(self.targets_group) < 3: #изначально три цели, если группа становиться меньше значит начинаем добавлять новую пнг с новими кординатами
+                    x = random.randint(50, 300)  
+                    y = random.randint(50, 150)  
+                    speed = random.uniform(1, 3)
+                    if (x, y) in used_positions:
+                        continue
+
+                    used_positions.add((x, y))
+                    img = random.choice(self.target_images)
+                    self.targets_group.add(Targets(x, y, img, speed))
+                
+                #создаем вражеские пули
+                for eb in self.enemy_bullets:
+                    eb.update_enemy_bullet()
+                    eb.draw_enemy_bullet(self.WIN)
+                    if eb.cheack_for_collide(self.tank.tank_img_rect, self.enemy_bullets):
+                        self.tank.tank_hp -= 5
+                        self.cheack_for_lose()
+                    
+                self.field.remove_offscren_enemy_bullets(self.enemy_bullets)
+                self.targets_group.update()
+                self.targets_group.draw(self.WIN)
+                self.draw_score()
+                self.draw_hp()
+            
+                pygame.display.update()
 
         pygame.quit()
 
